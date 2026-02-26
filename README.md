@@ -24,14 +24,30 @@ A self-hostable Heroku/Netlify/Vercel alternative that supports multiple deploym
 - Database management
 - Automatic SSL certificates
 - Resource monitoring
+- Docker container orchestration
+
+**Supported Systems:**
+- **OS:** Debian-based, RedHat-based, SUSE-based, Arch Linux, Alpine Linux, Raspberry Pi OS 64-bit
+- **Architecture:** AMD64, ARM64
+- **Requirements:** 2 CPU cores, 2GB RAM, 30GB storage minimum
 
 ## 📋 Prerequisites
 
+### For Dokploy
 - Ubuntu 24.04 LTS server
 - Root or sudo access
 - Minimum 2GB RAM recommended
 - 20GB+ available disk space
 - Internet connection for downloading packages
+
+### For Coolify
+- **Supported OS:** Debian-based, RedHat-based, SUSE-based, Arch Linux, Alpine Linux, Raspberry Pi OS 64-bit
+- **Architecture:** AMD64 or ARM64
+- **Minimum Requirements:** 2 CPU cores, 2GB RAM, 30GB storage
+- Root access (non-root users not fully supported)
+- Internet connection for downloading packages
+
+**Note:** Use a fresh server for Coolify to avoid conflicts with existing applications.
 
 ## 🛠️ Installation
 
@@ -77,11 +93,13 @@ sudo ./install-coolify.sh
 
 ### Security Recommendations
 
+- **Create admin account immediately** after Coolify installation (critical security step)
 - Change default passwords immediately
 - Configure SSL certificates for production use
 - Set up regular backups
 - Keep the platform updated
 - Use strong authentication methods
+- Configure firewall properly
 
 ## 📚 Documentation & Support
 
@@ -97,21 +115,32 @@ sudo ./install-coolify.sh
 
 ## 🔍 What Gets Installed
 
-Both scripts automatically install and configure:
-
+### Dokploy Installation
 - **Docker Engine** - Container runtime
 - **Docker Compose** - Multi-container orchestration
 - **Required dependencies** - curl, git, unzip, etc.
 - **Firewall rules** - Basic security configuration
-- **Platform software** - The respective self-hosting platform
+- **Dokploy platform** - The self-hosting platform
+
+### Coolify Installation
+- **Essential tools** - curl, wget, git, jq, openssl
+- **Docker Engine (v24+)** - Latest container runtime with proper configuration
+- **Docker daemon settings** - Optimized logging and performance
+- **SSH key generation** - For server management
+- **Coolify platform** - Complete self-hosting solution
+- **Directory structure** - Organized at `/data/coolify`
 
 ## ⚠️ Important Notes
 
 - **Backup your data** before running these scripts
 - **Review firewall settings** after installation
-- **These scripts are designed for Ubuntu 24.04** - other versions may require modifications
-- **Run with sudo privileges** as system-level changes are required
+- **For Coolify:** Immediately create admin account after installation to prevent unauthorized access
+- **Docker via snap is not supported** for Coolify installations
+- **Coolify requires Docker 24+** - the script will update if needed
+- **Use fresh servers** when possible to avoid conflicts
+- **Run with root privileges** as system-level changes are required
 - **Ensure adequate server resources** for your expected workload
+- **Non-LTS Ubuntu versions** require manual Coolify installation
 
 ## 🤝 Contributing
 
