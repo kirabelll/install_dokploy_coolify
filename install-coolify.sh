@@ -1,162 +1,134 @@
 #!/bin/bash
 
-# Coolify Installation Script
-# This script installs Coolify - an open-source alternative to Heroku/Netlify/Vercel
-# Based on official Coolify documentation: https://coolify.io/docs/get-started/installation
-# 
-# Supported OS: Debian-based, RedHat-based, SUSE-based, Arch Linux, Alpine Linux, Raspberry Pi OS 64-bit
-# Supported Architectures: AMD64, ARM64
-# Minimum Requirements: 2 CPU cores, 2GB RAM, 30GB storage
-#
+# Coolify Automatic Installation Script for Ubuntu 24.04
+# This script fully automates Coolify installation with no user interaction required
 # Run this script as: sudo ./install-coolify.sh
 
 set -e
 
-echo "========================================="
-echo "   Coolify Auto Installer"
-echo "========================================="
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
 
-# Check if running as root
+# Function to print colored output
+print_status() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+print_header() {
+    echo -e "${PURPLE}$1${NC}"
+}
+
+print_header "========================================="
+print_header "   Coolify Automatic Installer"
+print_header "========================================="
+
+# Check if running with sudo
 if [[ $EUID -ne 0 ]]; then
-   echo "❌ This script must be run as root or with sudo privileges."
+   print_error "This script must be run with sudo privileges."
    echo "Usage: sudo ./install-coolify.sh"
    exit 1
 fi
 
-# Detect OS and architecture
-echo "🔍 Detecting system information..."
-OS_ID=$(grep '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
-OS_VERSION=$(grep '^VERSION_ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"' || echo "unknown")
-ARCH=$(uname -m)
+# Get the actual user who ran sudo
+ACTUAL_USER=${SUDO_USER:-$USER}
+ACTUAL_HOME=$(eval echo ~$ACTUAL_USER)
 
-echo "   OS: $OS_ID $OS_VERSION"
-echo "   Architecture: $ARCH"
+print_status "Starting automatic Coolify installation..."
+print_status "Target user: $ACTUAL_USER"
 
-# Check architecture support
-if [[ "$ARCH" != "x86_64" && "$ARCH" != "aarch64" && "$ARCH" != "arm64" ]]; then
-    echo "❌ Unsupported architecture: $ARCH"
-    echo "   Coolify supports AMD64 and ARM64 only"
-    exit 1
-fi
-
-# Check minimum requirements
-echo "⚠️  Minimum requirements: 2 CPU cores, 2GB RAM, 30GB storage"
-echo "   Please ensure your server meets these requirements"
-
-# Check for snap Docker installation (not supported)
-if command -v snap &> /dev/null && snap list docker &> /dev/null 2>&1; then
-    echo "❌ Docker installed via snap is not supported!"
-    echo "   Please remove snap Docker and use the official Docker installation"
-    exit 1
-fi
+# Set non-interactive mode for apt
+export DEBIAN_FRONTEND=noninteractive
 
 # Update system packages
-echo "📦 Updating system packages..."
-if command -v apt &> /dev/null; then
-    apt update && apt upgrade -y
-    # Install essential tools for Debian-based systems
-    apt install -y curl wget git jq openssl
-elif command -v yum &> /dev/null; then
-    yum update -y
-    yum install -y curl wget git jq openssl
-elif command -v dnf &> /dev/null; then
-    dnf update -y
-    dnf install -y curl wget git jq openssl
-elif command -v zypper &> /dev/null; then
-    zypper refresh && zypper update -y
-    zypper install -y curl wget git jq openssl
-elif command -v pacman &> /dev/null; then
-    pacman -Syu --noconfirm
-    pacman -S --noconfirm curl wget git jq openssl
-elif command -v apk &> /dev/null; then
-    apk update && apk upgrade
-    apk add curl wget git jq openssl
-else
-    echo "⚠️  Could not detect package manager. Please ensure curl, wget, git, jq, and openssl are installed."
-fi
+print_status "Updating system packages..."
+apt update -y
+apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
 
-# Check if Docker is installed and version
-if command -v docker &> /dev/null; then
-    DOCKER_VERSION=$(docker --version | grep -oE '[0-9]+\.[0-9]+' | head -1)
-    DOCKER_MAJOR=$(echo $DOCKER_VERSION | cut -d. -f1)
+# Install required dependencies
+print_status "Installing required dependencies..."
+apt install -y curl wget git unzip ca-certificates gnupg lsb-release ufw
+
+# Configure firewall automatically
+print_status "Configuring firewall..."
+ufw --force reset
+ufw allow 22/tcp   # SSH
+ufw allow 80/tcp   # HTTP
+ufw allow 443/tcp  # HTTPS
+ufw allow 8000/tcp # Coolify
+ufw --force enable
+
+# Check if Docker is installed
+if ! command -v docker &> /dev/null; then
+    print_status "Docker not found. Installing Docker..."
     
-    if [[ $DOCKER_MAJOR -lt 24 ]]; then
-        echo "⚠️  Docker version $DOCKER_VERSION detected. Coolify requires Docker 24+."
-        echo "   Updating Docker..."
-        curl -fsSL https://get.docker.com -o get-docker.sh
-        sh get-docker.sh
-        rm get-docker.sh
-    else
-        echo "✅ Docker $DOCKER_VERSION is already installed and compatible"
-    fi
+    # Remove old Docker versions
+    apt remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+    
+    # Add Docker repository
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+    
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    
+    apt update -y
+    apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    
+    # Start and enable Docker service
+    systemctl start docker
+    systemctl enable docker
+    
+    print_status "Docker installed successfully"
 else
-    echo "🐳 Installing Docker Engine (version 24+)..."
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sh get-docker.sh
-    rm get-docker.sh
+    print_status "Docker is already installed"
 fi
 
-# Start and enable Docker service
-echo "🔧 Configuring Docker service..."
-systemctl start docker
-systemctl enable docker
+# Add user to docker group
+usermod -aG docker $ACTUAL_USER
 
-# Configure Docker daemon settings
-echo "⚙️  Configuring Docker daemon..."
-mkdir -p /etc/docker
-cat > /etc/docker/daemon.json << 'EOF'
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  }
-}
-EOF
+# Install Coolify automatically
+print_status "Installing Coolify..."
+sudo -u $ACTUAL_USER bash -c 'curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash'
 
-# Restart Docker to apply configuration
-systemctl restart docker
-
-# Install Coolify using official installer
-echo "🌟 Installing Coolify..."
-curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+# Get server IP for display
+SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo "YOUR_SERVER_IP")
 
 echo ""
-echo "========================================="
-echo "🎉 Coolify Installation Completed!"
-echo "========================================="
+print_header "🎉 Coolify installation completed successfully!"
 echo ""
-echo "📋 Next Steps:"
-echo "1. Access Coolify at: http://$(curl -s ifconfig.me):8000"
-echo "   (Replace with your server's IP if the above doesn't work)"
+echo -e "${CYAN}📋 Access Information:${NC}"
+echo "   External URL: http://$SERVER_IP:8000"
+echo "   Local URL: http://localhost:8000"
 echo ""
-echo "2. 🚨 IMPORTANT: Create your admin account IMMEDIATELY!"
-echo "   If someone else accesses the registration page first,"
-echo "   they could gain full control of your server."
+echo -e "${CYAN}📚 Resources:${NC}"
+echo "   Documentation: https://coolify.io/docs"
+echo "   GitHub: https://github.com/coollabsio/coolify"
+echo "   Support: https://coolify.io/docs/contact"
 echo ""
-echo "3. Configure your firewall (if needed):"
-echo "   ufw allow 8000/tcp"
+echo -e "${CYAN}🔧 Automatic Configuration Applied:${NC}"
+echo "   ✅ System packages updated"
+echo "   ✅ Docker installed and configured"
+echo "   ✅ Firewall configured (ports 22, 80, 443, 8000)"
+echo "   ✅ User added to docker group"
+echo "   ✅ Coolify installed and ready"
 echo ""
-echo "📚 Resources:"
-echo "• Documentation: https://coolify.io/docs"
-echo "• Discord Support: https://coolify.io/discord"
-echo "• GitHub: https://github.com/coollabsio/coolify"
+print_header "� Final Step:"
+echo "Log out and log back in, then access Coolify at the URL above"
+echo "Or run: newgrp docker && docker ps"
 echo ""
-echo "💡 Tips:"
-echo "• Use a fresh server for best results"
-echo "• Minimum 2GB RAM, 2 CPU cores recommended"
-echo "• Monitor resource usage if running builds on same server"
-echo "• Consider enabling swap space for better performance"
+print_warning "For production use, configure SSL certificates and secure authentication!"
 echo ""
-echo "⚠️  Security Reminders:"
-echo "• Change default passwords immediately"
-echo "• Configure SSL certificates for production"
-echo "• Set up regular backups"
-echo "• Keep Coolify updated"
-echo ""
-echo "🔧 Troubleshooting:"
-echo "• If you can't access Coolify, check firewall settings"
-echo "• For Raspberry Pi: use private IP address"
-echo "• Join Discord for community support"
-echo ""
-echo "========================================="

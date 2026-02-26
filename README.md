@@ -51,29 +51,35 @@ A self-hostable Heroku/Netlify/Vercel alternative that supports multiple deploym
 
 ## 🛠️ Installation
 
-### Install Dokploy
+### Automatic Coolify Installation (Recommended)
+
+The Coolify installer is now fully automatic with no user prompts required:
 
 ```bash
-# Make the script executable
-chmod +x ./install-dokploy.sh
+# Make the script executable and run
+chmod +x ./install-coolify.sh
+sudo ./install-coolify.sh
+```
 
-# Run the installation
+**What it does automatically:**
+- Updates system packages (non-interactive)
+- Installs all required dependencies
+- Configures firewall rules (SSH, HTTP, HTTPS, Coolify port)
+- Installs and configures Docker
+- Adds user to docker group
+- Downloads and installs Coolify
+- Displays access URLs and next steps
+
+**Access:** `http://YOUR_SERVER_IP:8000`
+
+### Manual Dokploy Installation
+
+```bash
+chmod +x ./install-dokploy.sh
 sudo ./install-dokploy.sh
 ```
 
 **Access:** `http://YOUR_SERVER_IP:3000`
-
-### Install Coolify
-
-```bash
-# Make the script executable
-chmod +x ./install-coolify.sh
-
-# Run the installation
-sudo ./install-coolify.sh
-```
-
-**Access:** `http://YOUR_SERVER_IP:8000`
 
 ## 🔧 Post-Installation Steps
 
